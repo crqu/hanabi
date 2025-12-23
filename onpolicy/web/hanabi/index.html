@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Hanabi vs Trained Policy</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    pre { background: #f5f5f5; padding: 10px; }
+    button { margin-right: 8px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h2>Hanabi - Play as Agent 0 vs Trained Policy (Agent 1)</h2>
+  <div>
+    <button onclick="resetGame()">Reset Game</button>
+  </div>
+  <div id="status"></div>
+  <h3>Available Actions</h3>
+  <div id="actions"></div>
+
+  <h3>Board</h3>
+  <div id="board"></div>
+  <script>
+    const api = location.origin;
+
+    async function resetGame() {
+      const res = await fetch(`${api}/reset`, { method: "POST" });
+      const data = await res.json();
+      renderState(data.state);
+      document.getElementById('status').innerText = 'Game reset.';
+    }
+
+    async function takeAction(a) {
+      const res = await fetch(`${api}/step`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({action: a})
+      });
+      const data = await res.json();
+      renderState(data.state);
+      const humanTxt = data.actions_text ? data.actions_text[0] : a;
+      const aiTxt = data.actions_text ? data.actions_text[1] : data.actions ? data.actions[1] : null;
+      document.getElementById('status').innerText = `You: ${humanTxt}; AI: ${aiTxt ?? 'n/a'}; rewards: ${data.rewards}; done: ${data.done}`;
+    }
+
+    function renderState(state) {
+      const actionsDiv = document.getElementById('actions');
+      actionsDiv.innerHTML = '';
+      if (state.legal_moves) {
+        state.legal_moves.forEach(a => {
+          const btn = document.createElement('button');
+          btn.innerText = `${a.text}`;
+          btn.onclick = () => takeAction(a.id);
+          actionsDiv.appendChild(btn);
+        });
+      }
+
+      // Render basic board info
+      const boardDiv = document.getElementById('board');
+      const info = [];
+      info.push(`<b>Current Player:</b> ${state.current_player}`);
+      if (state.life_tokens !== undefined) info.push(`<b>Life Tokens:</b> ${state.life_tokens}`);
+      if (state.information_tokens !== undefined) info.push(`<b>Info Tokens:</b> ${state.information_tokens}`);
+      if (state.fireworks) {
+        const fw = Object.entries(state.fireworks).map(([c,v]) => `${c}:${v}`).join(' ');
+        info.push(`<b>Fireworks:</b> ${fw}`);
+      }
+      if (state.discard_pile) {
+        const disc = state.discard_pile.join(' | ');
+        info.push(`<b>Discard:</b> ${disc}`);
+      }
+      // Show observed hands (agent0 sees teammate's hand fully, own cards as None)
+      if (state.observed_hands) {
+        const handsHtml = state.observed_hands.map((hand, idx) => {
+          const cards = hand.join(' | ');
+          return `<div>Player ${idx} hand: ${cards}</div>`;
+        }).join('');
+        info.push(handsHtml);
+      }
+      boardDiv.innerHTML = info.join('<br/>');
+    }
+
+    resetGame();
+  </script>
+</body>
+</html>

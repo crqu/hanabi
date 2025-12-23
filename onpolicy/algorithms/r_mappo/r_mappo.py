@@ -27,6 +27,7 @@ class R_MAPPO():
         self.data_chunk_length = args.data_chunk_length
         self.value_loss_coef = args.value_loss_coef
         self.entropy_coef = args.entropy_coef
+        self.risk_coef = getattr(args, "risk_coef", 0.0)
         self.max_grad_norm = args.max_grad_norm       
         self.huber_delta = args.huber_delta
 
@@ -139,6 +140,14 @@ class R_MAPPO():
             policy_action_loss = -torch.sum(torch.min(surr1, surr2), dim=-1, keepdim=True).mean()
 
         policy_loss = policy_action_loss
+
+        # Simple risk-averse penalty: discourage high-variance advantages.
+        if self.risk_coef > 0:
+            if self._use_policy_active_masks:
+                risk_term = ((adv_targ ** 2) * active_masks_batch).sum() / (active_masks_batch.sum() + 1e-6)
+            else:
+                risk_term = (adv_targ ** 2).mean()
+            policy_loss = policy_loss + self.risk_coef * risk_term
 
         self.policy.actor_optimizer.zero_grad()
 

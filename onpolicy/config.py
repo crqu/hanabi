@@ -158,7 +158,7 @@ def get_config():
 
     # prepare parameters
     parser.add_argument("--algorithm_name", type=str,
-                        default='mappo', choices=["rmappo", "mappo", "happo", "hatrpo", "mat", "mat_dec"])
+                        default='mappo', choices=["rmappo", "mappo", "ippo", "risk_averse_ippo", "happo", "hatrpo", "mat", "mat_dec"])
 
     parser.add_argument("--experiment_name", type=str, default="check", help="an identifier to distinguish different experiment.")
     parser.add_argument("--seed", type=int, default=1, help="Random seed for numpy/torch")
@@ -272,6 +272,8 @@ def get_config():
     # run parameters
     parser.add_argument("--use_linear_lr_decay", action='store_true',
                         default=False, help='use a linear schedule on the learning rate')
+    parser.add_argument("--risk_coef", type=float, default=0.0,
+                        help="Non-zero adds variance/risk penalty to policy loss (risk-averse IPPO).")
     # save parameters
     parser.add_argument("--save_interval", type=int, default=1, help="time duration between contiunous twice models saving.")
 

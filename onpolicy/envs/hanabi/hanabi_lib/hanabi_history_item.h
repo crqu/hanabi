@@ -27,6 +27,7 @@ namespace hanabi_learning_env {
 struct HanabiHistoryItem {
   explicit HanabiHistoryItem(HanabiMove move_made) : move(move_made) {}
   HanabiHistoryItem(const HanabiHistoryItem& past_move) = default;
+  HanabiHistoryItem& operator=(const HanabiHistoryItem& other) = default;
   std::string ToString() const;
 
   // Move that was made.
