@@ -112,6 +112,20 @@ class ACTLayer(nn.Module):
         
         return action_probs
 
+    def get_dist(self, x, available_actions=None):
+        """
+        Return the underlying action distribution without sampling.
+        Used when downstream code (e.g., risk-averse updates) needs
+        explicit distributions for KL computations.
+        """
+        if self.mixed_action:
+            return [self.action_outs[0](x), self.action_outs[1](x, available_actions)]
+        if self.multi_discrete:
+            return [head(x) for head in self.action_outs]
+        if self.mujoco_box:
+            return self.action_out(x)
+        return self.action_out(x, available_actions)
+
     def evaluate_actions(self, x, action, available_actions=None, active_masks=None):
         """
         Compute log probability and entropy of given actions.
@@ -176,6 +190,69 @@ class ACTLayer(nn.Module):
                 dist_entropy = action_logits.entropy().mean()
         
         return action_log_probs, dist_entropy
+
+    def evaluate_actions_with_dist(self, x, action, available_actions=None, active_masks=None):
+        """
+        Evaluate actions while also returning the action distribution object.
+        This mirrors evaluate_actions but exposes the distribution for KL terms.
+        """
+        if self.mixed_action:
+            a, b = action.split((2, 1), -1)
+            b = b.long()
+            action = [a, b]
+            action_log_probs = []
+            dist_entropy = []
+            dists = []
+            for action_out, act in zip(self.action_outs, action):
+                action_logit = action_out(x)
+                dists.append(action_logit)
+                action_log_probs.append(action_logit.log_probs(act))
+                if active_masks is not None:
+                    if len(action_logit.entropy().shape) == len(active_masks.shape):
+                        dist_entropy.append((action_logit.entropy() * active_masks).sum()/active_masks.sum())
+                    else:
+                        dist_entropy.append((action_logit.entropy() * active_masks.squeeze(-1)).sum()/active_masks.sum())
+                else:
+                    dist_entropy.append(action_logit.entropy().mean())
+            action_log_probs = torch.sum(torch.cat(action_log_probs, -1), -1, keepdim=True)
+            dist_entropy = dist_entropy[0] / 2.0 + dist_entropy[1] / 0.98
+            return action_log_probs, dist_entropy, dists
+
+        if self.multi_discrete:
+            action = torch.transpose(action, 0, 1)
+            action_log_probs = []
+            dist_entropy = []
+            dists = []
+            for action_out, act in zip(self.action_outs, action):
+                action_logit = action_out(x)
+                dists.append(action_logit)
+                action_log_probs.append(action_logit.log_probs(act))
+                if active_masks is not None:
+                    dist_entropy.append((action_logit.entropy()*active_masks.squeeze(-1)).sum()/active_masks.sum())
+                else:
+                    dist_entropy.append(action_logit.entropy().mean())
+
+            action_log_probs = torch.cat(action_log_probs, -1)
+            dist_entropy = sum(dist_entropy)/len(dist_entropy)
+            return action_log_probs, dist_entropy, dists
+
+        if self.mujoco_box:
+            action_logits = self.action_out(x)
+            action_log_probs = action_logits.log_probs(action)
+            if active_masks is not None:
+                dist_entropy = (action_logits.entropy()*active_masks.squeeze(-1)).sum()/active_masks.sum()
+            else:
+                dist_entropy = action_logits.entropy().mean()
+            return action_log_probs, dist_entropy, action_logits
+
+        action_logits = self.action_out(x, available_actions)
+        action_log_probs = action_logits.log_probs(action)
+        if active_masks is not None:
+            dist_entropy = (action_logits.entropy()*active_masks.squeeze(-1)).sum()/active_masks.sum()
+        else:
+            dist_entropy = action_logits.entropy().mean()
+
+        return action_log_probs, dist_entropy, action_logits
 
     def evaluate_actions_trpo(self, x, action, available_actions=None, active_masks=None):
         """

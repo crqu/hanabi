@@ -79,7 +79,7 @@ def main(args):
         print("u are choosing to use mappo, we set use_recurrent_policy & use_naive_recurrent_policy to be False")
         all_args.use_recurrent_policy = False 
         all_args.use_naive_recurrent_policy = False
-    elif all_args.algorithm_name == "ippo":
+    elif all_args.algorithm_name in ["ippo", "risk_averse_ippo"]:
         print("u are choosing to use ippo, we set use_centralized_V to be False.")
         all_args.use_centralized_V = False
     else:

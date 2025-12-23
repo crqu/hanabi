@@ -46,6 +46,10 @@ class Runner(object):
 
         # dir
         self.model_dir = self.all_args.model_dir
+        if self.all_args.algorithm_name == "risk_averse_ippo":
+            # Two-agent setup: agent 0 is primary PPO, agent 1 is adversary by default.
+            self.reference_id = getattr(self.all_args, "reference_id", 0)
+            self.adversary_id = getattr(self.all_args, "adversary_id", 1)
 
         if self.use_render:
             import imageio
@@ -73,6 +77,9 @@ class Runner(object):
         elif self.all_args.algorithm_name == "hatrpo":
             from onpolicy.algorithms.hatrpo.hatrpo_trainer import HATRPO as TrainAlgo
             from onpolicy.algorithms.hatrpo.policy import HATRPO_Policy as Policy
+        elif self.all_args.algorithm_name == "risk_averse_ippo":
+            from onpolicy.algorithms.risk_averse_ippo.risk_averse_ippo import RiskAverseIPPO as TrainAlgo
+            from onpolicy.algorithms.r_mappo.algorithm.rMAPPOPolicy import R_MAPPOPolicy as Policy
         else:
             from onpolicy.algorithms.r_mappo.r_mappo import R_MAPPO as TrainAlgo
             from onpolicy.algorithms.r_mappo.algorithm.rMAPPOPolicy import R_MAPPOPolicy as Policy
@@ -130,6 +137,9 @@ class Runner(object):
                                                                 self.buffer[agent_id].rnn_states_critic[-1],
                                                                 self.buffer[agent_id].masks[-1])
             next_value = _t2n(next_value)
+            if self.algorithm_name == "risk_averse_ippo" and agent_id == getattr(self, "adversary_id", -1):
+                # adversary uses negated rewards to minimize primary agent returns
+                self.buffer[agent_id].rewards = -self.buffer[agent_id].rewards
             self.buffer[agent_id].compute_returns(next_value, self.trainer[agent_id].value_normalizer)
 
     def train(self):
@@ -159,7 +169,16 @@ class Runner(object):
                                                             self.buffer[agent_id].masks[:-1].reshape(-1, *self.buffer[agent_id].masks.shape[2:]),
                                                             available_actions,
                                                             self.buffer[agent_id].active_masks[:-1].reshape(-1, *self.buffer[agent_id].active_masks.shape[2:]))
-            train_info = self.trainer[agent_id].train(self.buffer[agent_id])
+            ref_policy = None
+            is_adversary = False
+            if self.algorithm_name == "risk_averse_ippo":
+                is_adversary = (agent_id == getattr(self, "adversary_id", -1))
+                if is_adversary:
+                    ref_policy = self.trainer[getattr(self, "reference_id", 0)].policy
+
+            train_info = self.trainer[agent_id].train(self.buffer[agent_id],
+                                                      ref_policy=ref_policy,
+                                                      is_adversary=is_adversary)
 
             if self.all_args.algorithm_name == "hatrpo":
                 new_actions_logprob, _, _, _, _ =self.trainer[agent_id].policy.actor.evaluate_actions(self.buffer[agent_id].obs[:-1].reshape(-1, *self.buffer[agent_id].obs.shape[2:]),

@@ -2,20 +2,18 @@
 set -euo pipefail
 
 # ==== 可按需修改 ====
-ACTOR_PATH_B="../actor.pt"   # AI 模型路径
+ACTOR_PATH_B="../actor.pt"  
 HANABI_NAME="Hanabi-Full"
 NUM_AGENTS=2
 HIDDEN_SIZE=512
 LAYER_N=2
-USE_RECURRENT_FLAG=""          # 如果模型是 RNN，则设为 "--use_recurrent_b"
+USE_RECURRENT_FLAG=""         
 HOST="0.0.0.0"
 PORT=8000
 CONDA_ENV="marl"
 CUDA_FLAG="--cuda"
 WEB_DIR="$(pwd)/on-policy/onpolicy/web/hanabi"
 
-# 激活环境
-# conda activate "${CONDA_ENV}"
 
 cd on-policy
 

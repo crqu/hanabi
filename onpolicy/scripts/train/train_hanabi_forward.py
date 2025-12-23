@@ -82,8 +82,10 @@ def main(args):
         all_args.use_recurrent_policy = False 
         all_args.use_naive_recurrent_policy = False
     elif all_args.algorithm_name in ["ippo", "risk_averse_ippo"]:
-        print("u are choosing to use {} so we set use_centralized_V to False".format(all_args.algorithm_name))
+        print("u are choosing to use ippo, we set use_centralized_V to be False")
         all_args.use_centralized_V = False
+        if all_args.algorithm_name == "risk_averse_ippo":
+            all_args.share_policy = False
     else:
         raise NotImplementedError
 
@@ -156,13 +158,10 @@ def main(args):
     }
 
     # run experiments
-    # Only shared runner exists; fall back to it even if share_policy=False.
-    # This avoids import errors when separated runner is missing.
     if all_args.share_policy:
         from onpolicy.runner.shared.hanabi_runner_forward import HanabiRunner as Runner
     else:
-        print("separated Hanabi runner not implemented; using shared runner instead.")
-        from onpolicy.runner.shared.hanabi_runner_forward import HanabiRunner as Runner
+        from onpolicy.runner.separated.hanabi_runner_forward import HanabiRunner as Runner
 
     runner = Runner(config)
     runner.run()
@@ -175,18 +174,7 @@ def main(args):
     if all_args.use_wandb:
         run.finish()
     else:
-        summary_path = str(runner.log_dir + '/summary.json')
-        try:
-            runner.writter.export_scalars_to_json(summary_path)
-        except TypeError:
-            # Handle numpy types that json can't serialize.
-            import json
-            cleaned = {}
-            for k, v in runner.writter.scalar_dict.items():
-                cleaned[k] = {ik: (iv.item() if isinstance(iv, np.generic) else iv)
-                              for ik, iv in v.items()}
-            with open(summary_path, "w") as f:
-                json.dump(cleaned, f)
+        runner.writter.export_scalars_to_json(str(runner.log_dir + '/summary.json'))
         runner.writter.close()
 
 

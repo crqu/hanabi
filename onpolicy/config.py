@@ -158,7 +158,7 @@ def get_config():
 
     # prepare parameters
     parser.add_argument("--algorithm_name", type=str,
-                        default='mappo', choices=["rmappo", "mappo", "ippo", "risk_averse_ippo", "happo", "hatrpo", "mat", "mat_dec"])
+                        default='mappo', choices=["rmappo", "mappo", "happo", "hatrpo", "mat", "mat_dec", "risk_averse_ippo"])
 
     parser.add_argument("--experiment_name", type=str, default="check", help="an identifier to distinguish different experiment.")
     parser.add_argument("--seed", type=int, default=1, help="Random seed for numpy/torch")
@@ -210,6 +210,9 @@ def get_config():
                         help="Whether to use Orthogonal initialization for weights and 0 initialization for biases")
     parser.add_argument("--gain", type=float, default=0.01,
                         help="The gain # of last action layer")
+    parser.add_argument("--risk_kl_coef", type=float, default=0.2, help="KL coefficient for risk-averse IPPO adversary.")
+    parser.add_argument("--adversary_id", type=int, default=1, help="Adversary agent index for risk_averse_ippo.")
+    parser.add_argument("--reference_id", type=int, default=0, help="Reference (primary) agent index for risk_averse_ippo.")
 
     # recurrent parameters
     parser.add_argument("--use_naive_recurrent_policy", action='store_true',
@@ -272,8 +275,6 @@ def get_config():
     # run parameters
     parser.add_argument("--use_linear_lr_decay", action='store_true',
                         default=False, help='use a linear schedule on the learning rate')
-    parser.add_argument("--risk_coef", type=float, default=0.0,
-                        help="Non-zero adds variance/risk penalty to policy loss (risk-averse IPPO).")
     # save parameters
     parser.add_argument("--save_interval", type=int, default=1, help="time duration between contiunous twice models saving.")
 
